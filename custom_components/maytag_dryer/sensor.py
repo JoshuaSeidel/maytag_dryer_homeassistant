@@ -78,6 +78,32 @@ class maytag_dryerSensor(Entity):
         self._reauthCouter = 0
         self._state = "offline"
         self.hass = hass
+        self._modelNumber = None
+        self._applianceId = None
+        self._lastSynced = None
+        self._lastModified = None
+        self._serialNumber = None
+        self._doorOpen = None
+        self._status = None
+        self._cycleName = None
+        self._cycleId = None
+        self._manualDryTime = None
+        self._drynessLevel = None
+        self._airflow = None
+        self._drying = None
+        self._damp = None
+        self._steaming = None
+        self._sensing = None
+        self._cooldown = None
+        self._temperature = None
+        self._operations = None
+        self._powerOnHours = None
+        self._hoursInUse = None
+        self._totalCycles = None
+        self._remoteEnabled = None
+        self._timeRemaining = None
+        self._online = None
+        self._end_time = None
         
     @property
     def name(self):
@@ -301,6 +327,42 @@ class maytag_washerSensor(Entity):
         self._state = "offline"
         self._updateCounter = 0
         self.hass = hass
+        self._applianceId = None
+        self._modelNumber = None
+        self._lastSynced = None
+        self._lastModified = None
+        self._serialNumber = None
+        self._doorOpen = None
+        self._doorLocked = None
+        self._drawerOpen = None
+        self._status = None
+        self._cycleName = None
+        self._cycleId = None
+        self._needClean = None
+        self._delayTime = None
+        self._delayRemaining = None
+        self._rinsing = None
+        self._draining = None
+        self._filling = None
+        self._spinning = None
+        self._soaking = None
+        self._sensing = None
+        self._washing = None
+        self._addGarmet = None
+        self._temperature = None
+        self._operations = None
+        self._powerOnHours = None
+        self._hoursInUse = None
+        self._totalCycles = None
+        self._remoteEnabled = None
+        self._timeRemaining = None
+        self._spinSpeed = None
+        self._soilLevel = None
+        self._online = None
+        self._end_time = None
+        self._dispense1Enable = None
+        self._dispense1Level = None
+        self._dispense1Concentration = None
 
     @property
     def name(self):
