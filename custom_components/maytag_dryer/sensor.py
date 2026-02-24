@@ -58,6 +58,7 @@ class maytag_dryerSensor(SensorEntity):
     def __init__(self, hass, user, password,said):
         """Initialize the sensor."""
         self._name = "Dryer"
+        self.entity_id = 'sensor.maytag_dryer_' + said.lower()
         self._user = user
         self._password = password
         self._said = said
@@ -97,11 +98,6 @@ class maytag_dryerSensor(SensorEntity):
     def name(self):
         """Return the name of the sensor."""
         return self._name
-
-    @property
-    def entity_id(self):
-        """Return the entity ID."""
-        return 'sensor.maytag_dryer_' + (self._said).lower()
 
     @property
     def unique_id(self):
@@ -284,6 +280,7 @@ class maytag_washerSensor(SensorEntity):
     def __init__(self, hass, user, password,said):
         """Initialize the sensor."""
         self._name = "washer"
+        self.entity_id = 'sensor.maytag_washer_' + said.lower()
         self._user = user
         self._password = password
         self._said = said
@@ -334,12 +331,6 @@ class maytag_washerSensor(SensorEntity):
     def name(self):
         """Return the name of the sensor."""
         return self._name
-
-    @property
-    def entity_id(self):
-        """Return the entity ID."""
-        
-        return 'sensor.maytag_washer_' + (self._said).lower()
 
     @property
     def unique_id(self):
