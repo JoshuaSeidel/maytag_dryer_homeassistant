@@ -17,8 +17,8 @@ CONF_WASHER_SAIDS = "washersaids"
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
-        vol.Required(CONF_DRYER_SAIDS, default=[]): vol.All(cv.ensure_list, [cv.string]),
-        vol.Required(CONF_WASHER_SAIDS, default=[]): vol.All(cv.ensure_list, [cv.string]),
+        vol.Optional(CONF_DRYER_SAIDS, default=[]): vol.All(cv.ensure_list, [cv.string]),
+        vol.Optional(CONF_WASHER_SAIDS, default=[]): vol.All(cv.ensure_list, [cv.string]),
     }
 )
 

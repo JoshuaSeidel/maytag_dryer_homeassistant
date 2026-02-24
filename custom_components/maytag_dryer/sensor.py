@@ -1,24 +1,13 @@
 """Sensor for maytag_dryer account status."""
-from datetime import timedelta, datetime
+from datetime import timedelta
 import logging
-import requests
-import arrow
-import xmltodict, json
-from xml.etree import ElementTree
-
-from time import mktime
 
 import voluptuous as vol
 
 from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorEntity
-from homeassistant.core import callback
 import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.event import track_time_interval
-from homeassistant.util.dt import utc_from_timestamp
-
-import asyncio
-from aiohttp import ClientError, ClientResponseError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.util import dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -40,8 +29,8 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     {
         vol.Required(CONF_USER): cv.string,
         vol.Required(CONF_PASSWORD): cv.string,
-        vol.Required(CONF_DRYER_SAIDS, default=[]): vol.All(cv.ensure_list, [cv.string]),
-        vol.Required(CONF_WASHER_SAIDS, default=[]): vol.All(cv.ensure_list, [cv.string]),
+        vol.Optional(CONF_DRYER_SAIDS, default=[]): vol.All(cv.ensure_list, [cv.string]),
+        vol.Optional(CONF_WASHER_SAIDS, default=[]): vol.All(cv.ensure_list, [cv.string]),
     }
 )
 
@@ -113,6 +102,11 @@ class maytag_dryerSensor(SensorEntity):
     def entity_id(self):
         """Return the entity ID."""
         return 'sensor.maytag_dryer_' + (self._said).lower()
+
+    @property
+    def unique_id(self):
+        """Return a unique ID."""
+        return f"maytag_dryer_{self._said.lower()}"
         
     @property
     def native_value(self):
@@ -129,14 +123,6 @@ class maytag_dryerSensor(SensorEntity):
         try:
             auth_url = "https://api.whrcloud.com/oauth/token"
             auth_header = {
-#                'no_auth': 'true',
-#                'wp-client-brand': 'MAYTAG',
-#                'wp-client-region': 'NAR',
-#                'wp-client-country': 'US',
-#                'wp-client-language': 'eng',
-#                'wp-client-version': '5.1.0',
-#                'wp-client-appname': 'com.maytag.android.mtapp',
-#                'wp-client-platform': 'ANDROID',
                 'content-type': 'application/x-www-form-urlencoded',
                 'user-agent': 'okhttp/4.12.0',
             }
@@ -145,14 +131,11 @@ class maytag_dryerSensor(SensorEntity):
             auth_data = {
                 'client_id': 'maytag_android_v1',
                 'client_secret': 'f1XfYji_D9KfZGovyp8PMgRzrFKjhjY26TV0hu3Mt1-tCCNPl9s95z7QLUfB9UgB',
-#                'wp-client-brand': 'MAYTAG',
-#                'wp-client-region': 'NAR',
                 'grant_type': 'password',
                 'username': self._user,
                 'password': self._password,
             }
 
-            headers = {}
             session = async_get_clientsession(self.hass)
             resp = await session.post(auth_url, data=auth_data, headers=auth_header)
             data = await resp.json()
@@ -161,11 +144,12 @@ class maytag_dryerSensor(SensorEntity):
             self._reauthorize = False
             self._status = "Authorized"
  
-        except: 
+        except Exception as err:
+            _LOGGER.error("Dryer authorization failed: %s", err)
             self._access_token = None
             self._reauthCouter = self._reauthCouter + 1
             self._reauthorize = True
-            self._status = "Authorization failed " + self._reauthCouter + " times"
+            self._status = "Authorization failed " + str(self._reauthCouter) + " times"
             self._state = "Authorization failed"
 
     async def async_update(self):
@@ -176,33 +160,15 @@ class maytag_dryerSensor(SensorEntity):
         
         if self._access_token is not None:
             try:
-                headers = {}
-
                 new_url = 'https://api.whrcloud.com/api/v1/appliance/' + self._said
                 
                 new_header = {
-#                    'wp-client-brand': 'MAYTAG',
-#                    'wp-client-region': 'NAR',
-#                    'wp-client-country': 'US',
-#                    'wp-client-language': 'eng',
-#                    'wp-client-version': '5.1.0',
-#                    'wp-client-appname': 'com.maytag.android.mtapp',
-#                    'wp-client-platform': 'ANDROID',
                     "Authorization": "bearer " + self._access_token,
                     'user-agent': 'okhttp/4.12.0',
                 }
  
-                # new_header = {
-                    # "Authorization": "Bearer " + self._access_token,
-                    # "Content-Type": "application/json",
-                    # "Host": "api.whrcloud.com",
-                    # "User-Agent": "okhttp/4.12.0",
-                    # "Pragma": "no-cache",
-                    # "Cache-Control": "no-cache",
-                # }
-                
                 session = async_get_clientsession(self.hass)
-                resp = await session.get(new_url, data={}, headers=new_header)
+                resp = await session.get(new_url, headers=new_header)
                 data = await resp.json()
                 self._applianceId = data.get('applianceId')
                 self._modelNumber = data.get('attributes').get('ModelNumber').get('value')
@@ -230,12 +196,13 @@ class maytag_dryerSensor(SensorEntity):
                 self._timeRemaining = data.get('attributes').get('Cavity_TimeStatusEstTimeRemaining').get('value')                  
                 self._online = data.get('attributes').get('Online').get('value') 
                 
-                self._end_time = datetime.now() + timedelta(seconds=int(self._timeRemaining))
+                self._end_time = dt_util.now() + timedelta(seconds=int(self._timeRemaining))
                 
                 #status: [0=off, 1=on but not running, 7=running, 6=paused, 10=cycle complete]
                 self._state =  UNIT_STATES.get(self._status,self._status)
                     
-            except:     
+            except Exception as err:
+                _LOGGER.error("Failed to update dryer state: %s", err)
                 self._modelNumber = None
                 self._applianceId = None
                 self._lastSynced = None
@@ -373,6 +340,11 @@ class maytag_washerSensor(SensorEntity):
         """Return the entity ID."""
         
         return 'sensor.maytag_washer_' + (self._said).lower()
+
+    @property
+    def unique_id(self):
+        """Return a unique ID."""
+        return f"maytag_washer_{self._said.lower()}"
         
     @property
     def native_value(self):
@@ -388,20 +360,8 @@ class maytag_washerSensor(SensorEntity):
         """Update device state."""
         try:
             auth_url = "https://api.whrcloud.com/oauth/token"
-            # auth_header = {
-                # "Content-Type": "application/x-www-form-urlencoded",
-                # "User-Agent": "okhttp/4.12.0",
-            # }
 
             auth_header = {
-                'no_auth': 'true',
-#                'wp-client-brand': 'MAYTAG',
-#                'wp-client-region': 'NAR',
-#                'wp-client-country': 'US',
-#                'wp-client-language': 'eng',
-#                'wp-client-version': '5.1.0',
-#                'wp-client-appname': 'com.maytag.android.mtapp',
-#                'wp-client-platform': 'ANDROID',
                 'content-type': 'application/x-www-form-urlencoded',
                 'user-agent': 'okhttp/4.12.0',
             }
@@ -410,15 +370,12 @@ class maytag_washerSensor(SensorEntity):
             auth_data = {
                 'client_id': 'maytag_android_v1',
                 'client_secret': 'f1XfYji_D9KfZGovyp8PMgRzrFKjhjY26TV0hu3Mt1-tCCNPl9s95z7QLUfB9UgB',
-#                'wp-client-brand': 'MAYTAG',
-#                'wp-client-region': 'NAR',
                 'grant_type': 'password',
                 'username': self._user,
                 'password': self._password,
             }
             
             
-            headers = {}
             session = async_get_clientsession(self.hass)
             resp = await session.post(auth_url, data=auth_data, headers=auth_header)
             data = await resp.json()
@@ -427,11 +384,12 @@ class maytag_washerSensor(SensorEntity):
             self._reauthCouter = 0
             self._reauthorize = False
             
-        except: 
+        except Exception as err:
+            _LOGGER.error("Washer authorization failed: %s", err)
             self._access_token = None
             self._reauthCouter = self._reauthCouter + 1
             self._reauthorize = True
-            self._status = "Authorization failed " + self._reauthCouter + " times"
+            self._status = "Authorization failed " + str(self._reauthCouter) + " times"
             self._state = "Authorization failed"
         
     async def async_update(self):
@@ -441,34 +399,15 @@ class maytag_washerSensor(SensorEntity):
         
         if self._access_token is not None:
             try:
-                  
-                headers = {}
-
                 new_url = 'https://api.whrcloud.com/api/v1/appliance/' + self._said
 
                 new_header = {
-#                    'wp-client-brand': 'MAYTAG',
-#                    'wp-client-region': 'NAR',
-#                    'wp-client-country': 'US',
-#                    'wp-client-language': 'eng',
-#                    'wp-client-version': '5.1.0',
-#                    'wp-client-appname': 'com.maytag.android.mtapp',
-#                    'wp-client-platform': 'ANDROID',
                     "Authorization": "bearer " + self._access_token,
                     'user-agent': 'okhttp/4.12.0',
                 }
  
-                # new_header = {
-                    # "Authorization": "Bearer " + self._access_token,
-                    # "Content-Type": "application/json",
-                    # "Host": "api.whrcloud.com",
-                    # "User-Agent": "okhttp/4.12.0",
-                    # "Pragma": "no-cache",
-                    # "Cache-Control": "no-cache",
-                # }
-
                 session = async_get_clientsession(self.hass)
-                resp = await session.get(new_url, data={}, headers=new_header)
+                resp = await session.get(new_url, headers=new_header)
                 data = await resp.json()
                 _LOGGER.debug(data)
                 self._applianceId = data.get('applianceId')
@@ -509,13 +448,14 @@ class maytag_washerSensor(SensorEntity):
                 self._spinSpeed = data.get('attributes').get('WashCavity_CycleSetSpinSpeed').get('value') 
                 self._soilLevel = data.get('attributes').get('WashCavity_CycleSetSoilLevel').get('value') 
                 self._online = data.get('attributes').get('Online').get('value') 
-                self._end_time = datetime.now() + timedelta(seconds=int(self._timeRemaining))
+                self._end_time = dt_util.now() + timedelta(seconds=int(self._timeRemaining))
                 #status: [0=off, 1=on but not running, 7=running, 6=paused, 10=cycle complete]
 
                 self._state = UNIT_STATES.get(self._status,self._status)                 
                 self._updateCounter = self._updateCounter + 1
                     
-            except:        
+            except Exception as err:
+                _LOGGER.error("Failed to update washer state: %s", err)
                 
                 self._status = "Data Update Failed"
                 self._state = "Data Update Failed" 
