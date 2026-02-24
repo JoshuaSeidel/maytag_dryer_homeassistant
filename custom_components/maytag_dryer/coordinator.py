@@ -127,7 +127,8 @@ class MaytagCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             )
 
         try:
-            data = await resp.json()
+            # Use content_type=None to accept any content-type the API returns
+            data = await resp.json(content_type=None)
         except (aiohttp.ContentTypeError, ValueError) as err:
             raise UpdateFailed(f"Could not parse authentication response: {err}") from err
 
@@ -176,7 +177,7 @@ class MaytagCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
             )
 
         try:
-            return await resp.json()
+            return await resp.json(content_type=None)
         except (aiohttp.ContentTypeError, ValueError) as err:
             raise UpdateFailed(
                 f"Could not parse response for appliance {said}: {err}"

@@ -75,20 +75,29 @@ async def _async_validate_credentials(
     try:
         async with asyncio.timeout(15):
             resp = await session.post(API_AUTH_URL, data=payload, headers=headers)
-    except (aiohttp.ClientError, asyncio.TimeoutError):
+    except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+        _LOGGER.error("Cannot connect to Whirlpool API: %s", err)
         return "cannot_connect"
+
+    _LOGGER.debug("Auth response status: %s", resp.status)
 
     if resp.status in (401, 403):
         return "invalid_auth"
     if resp.status != 200:
+        _LOGGER.error("Unexpected auth HTTP status: %s", resp.status)
         return "cannot_connect"
 
     try:
-        data = await resp.json()
-    except (aiohttp.ContentTypeError, ValueError):
+        # Use content_type=None to accept any content-type header the API returns
+        data = await resp.json(content_type=None)
+    except (aiohttp.ContentTypeError, ValueError) as err:
+        _LOGGER.error("Could not parse auth response: %s", err)
         return "cannot_connect"
 
+    _LOGGER.debug("Auth response keys: %s", list(data.keys()) if isinstance(data, dict) else type(data))
+
     if not data.get("access_token"):
+        _LOGGER.error("No access_token in auth response: %s", data)
         return "invalid_auth"
 
     return None
