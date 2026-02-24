@@ -1,0 +1,46 @@
+{
+  "title": "Maytag Dryer",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Maytag / Whirlpool",
+        "description": "Enter your Maytag app credentials and the SAID(s) for your appliances. You can find the SAID in the Maytag app under appliance details. Separate multiple SAIDs with commas.",
+        "data": {
+          "user": "Email address",
+          "password": "Password",
+          "dryersaids": "Dryer SAID(s) (comma-separated)",
+          "washersaids": "Washer SAID(s) (comma-separated)"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate Maytag / Whirlpool",
+        "description": "Your credentials are no longer valid. Please re-enter them.",
+        "data": {
+          "user": "Email address",
+          "password": "Password"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Maytag / Whirlpool",
+        "description": "Update your credentials or appliance SAIDs.",
+        "data": {
+          "user": "Email address",
+          "password": "Password",
+          "dryersaids": "Dryer SAID(s) (comma-separated)",
+          "washersaids": "Washer SAID(s) (comma-separated)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to the Whirlpool API. Check your network connection.",
+      "invalid_auth": "Invalid email or password.",
+      "no_saids": "Please enter at least one dryer or washer SAID.",
+      "unknown": "An unexpected error occurred."
+    },
+    "abort": {
+      "already_configured": "This Maytag account is already configured.",
+      "reauth_successful": "Re-authentication was successful.",
+      "unique_id_mismatch": "The email address does not match the original account."
+    }
+  }
+}

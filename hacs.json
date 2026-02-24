@@ -1,5 +1,5 @@
 {
-  "name": "maytag_dryer_homeassistant",
+  "name": "Maytag Dryer",
   "domains": ["sensor", "binary_sensor"],
   "iot_class": "Cloud Polling",
   "render_readme": true,

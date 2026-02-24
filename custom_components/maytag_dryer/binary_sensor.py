@@ -1,80 +1,118 @@
-"""Binary sensor for maytag_dryer account status."""
-import logging
+"""Binary sensor platform for the Maytag Dryer integration."""
+from __future__ import annotations
 
-import voluptuous as vol
+import logging
+from typing import Any
 
 from homeassistant.components.binary_sensor import (
     BinarySensorDeviceClass,
     BinarySensorEntity,
-    PLATFORM_SCHEMA,
 )
-import homeassistant.helpers.config_validation as cv
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
+
+from .const import (
+    APPLIANCE_TYPE_DRYER,
+    APPLIANCE_TYPE_WASHER,
+    DOMAIN,
+)
+from .coordinator import MaytagCoordinator, _safe_attr
 
 _LOGGER = logging.getLogger(__name__)
 
-CONF_DRYER_SAIDS = "dryersaids"
-CONF_WASHER_SAIDS = "washersaids"
 
-PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
-    {
-        vol.Optional(CONF_DRYER_SAIDS, default=[]): vol.All(cv.ensure_list, [cv.string]),
-        vol.Optional(CONF_WASHER_SAIDS, default=[]): vol.All(cv.ensure_list, [cv.string]),
-    }
-)
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    """Set up Maytag binary sensor entities from a config entry."""
+    coordinator: MaytagCoordinator = hass.data[DOMAIN][entry.entry_id]
 
+    entities: list[MaytagDoorBinarySensor] = []
 
-async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
-    """Set up the maytag_dryer binary sensor platform."""
-    entities = []
+    for said in coordinator.dryer_saids:
+        entities.append(MaytagDoorBinarySensor(coordinator, said, APPLIANCE_TYPE_DRYER))
 
-    for said in config.get(CONF_DRYER_SAIDS, []):
-        entities.append(MaytagDoorBinarySensor(hass, said, "dryer"))
+    for said in coordinator.washer_saids:
+        entities.append(MaytagDoorBinarySensor(coordinator, said, APPLIANCE_TYPE_WASHER))
 
-    for said in config.get(CONF_WASHER_SAIDS, []):
-        entities.append(MaytagDoorBinarySensor(hass, said, "washer"))
-
-    if entities:
-        async_add_entities(entities, True)
+    async_add_entities(entities)
 
 
-class MaytagDoorBinarySensor(BinarySensorEntity):
-    """Binary sensor representing the door open state of a Maytag appliance."""
+class MaytagDoorBinarySensor(CoordinatorEntity[MaytagCoordinator], BinarySensorEntity):
+    """Binary sensor representing the door open/closed state of a Maytag appliance.
 
-    def __init__(self, hass, said, appliance_type):
-        """Initialize the binary sensor."""
-        self.hass = hass
+    Reads door state directly from the coordinator data — no separate API call
+    needed, no race condition with the sensor platform.
+    """
+
+    _attr_device_class = BinarySensorDeviceClass.DOOR
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: MaytagCoordinator,
+        said: str,
+        appliance_type: str,
+    ) -> None:
+        """Initialise the binary sensor."""
+        super().__init__(coordinator)
         self._said = said
         self._appliance_type = appliance_type
-        self._is_on = None
+        self._attr_name = f"{appliance_type.title()} Door"
+        self._attr_unique_id = f"maytag_{appliance_type}_door_{said.lower()}"
+        self.entity_id = f"binary_sensor.maytag_{appliance_type}_door_{said.lower()}"
+
+    # ------------------------------------------------------------------
+    # Device info — same identifiers as the sensor so they share a device
+    # ------------------------------------------------------------------
 
     @property
-    def name(self):
-        """Return the name of the binary sensor."""
-        return f"Maytag {self._appliance_type.title()} Door"
+    def device_info(self) -> DeviceInfo:
+        """Return device info matching the corresponding sensor entity."""
+        raw = self.coordinator.data.get(self._said, {}) if self.coordinator.data else {}
+        attrs = raw.get("attributes", {})
+        model = _safe_attr(attrs, "ModelNumber")
+        serial = _safe_attr(attrs, "XCat_ApplianceInfoSetSerialNumber")
+
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._said)},
+            name=f"Maytag {self._appliance_type.title()} {self._said}",
+            manufacturer="Whirlpool / Maytag",
+            model=model,
+            serial_number=serial,
+        )
+
+    # ------------------------------------------------------------------
+    # State
+    # ------------------------------------------------------------------
 
     @property
-    def unique_id(self):
-        """Return a unique ID for this entity."""
-        return f"maytag_{self._appliance_type}_door_{self._said.lower()}"
+    def is_on(self) -> bool | None:
+        """Return True if the door is open."""
+        if not self.coordinator.data:
+            return None
+        raw = self.coordinator.data.get(self._said)
+        if raw is None:
+            return None
+        attrs = raw.get("attributes", {})
+        door_value = _safe_attr(attrs, "Cavity_OpStatusDoorOpen")
+        if door_value is None:
+            return None
+        try:
+            return bool(int(door_value))
+        except (ValueError, TypeError):
+            return None
 
-    @property
-    def device_class(self):
-        """Return the device class."""
-        return BinarySensorDeviceClass.DOOR
+    # ------------------------------------------------------------------
+    # CoordinatorEntity callback
+    # ------------------------------------------------------------------
 
-    @property
-    def is_on(self):
-        """Return true if the door is open."""
-        return self._is_on
-
-    async def async_update(self):
-        """Update door state from the associated sensor entity."""
-        sensor_entity_id = f"sensor.maytag_{self._appliance_type}_{self._said.lower()}"
-        state = self.hass.states.get(sensor_entity_id)
-        if state is not None:
-            door_value = state.attributes.get("dooropen")
-            if door_value is not None:
-                try:
-                    self._is_on = bool(int(door_value))
-                except (ValueError, TypeError):
-                    self._is_on = None
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self.async_write_ha_state()
