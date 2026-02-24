@@ -116,7 +116,13 @@ class MaytagCoordinator(DataUpdateCoordinator[dict[str, dict[str, Any]]]):
         except (aiohttp.ClientError, asyncio.TimeoutError) as err:
             raise UpdateFailed(f"Network error during authentication: {err}") from err
 
-        if resp.status in (401, 403):
+        if resp.status == 423:
+            raise ConfigEntryAuthFailed(
+                "Whirlpool account is locked (HTTP 423). "
+                "Unlock your account at account.maytag.com, then reconfigure the integration."
+            )
+        if resp.status in (400, 401, 403, 500):
+            # 400/401/403 = bad credentials; 500 = Whirlpool returns this for wrong password
             raise ConfigEntryAuthFailed(
                 f"Invalid credentials (HTTP {resp.status}). "
                 "Please reconfigure the integration."

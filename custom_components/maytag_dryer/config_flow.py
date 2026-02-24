@@ -81,7 +81,12 @@ async def _async_validate_credentials(
 
     _LOGGER.debug("Auth response status: %s", resp.status)
 
-    if resp.status in (401, 403):
+    if resp.status == 423:
+        _LOGGER.error("Whirlpool account is locked (HTTP 423). Unlock at account.maytag.com or wait and retry.")
+        return "account_locked"
+    if resp.status in (400, 401, 403, 500):
+        # 400/401/403 = bad credentials; 500 = Whirlpool returns this for wrong password
+        _LOGGER.debug("Auth failed with HTTP %s — treating as invalid credentials", resp.status)
         return "invalid_auth"
     if resp.status != 200:
         _LOGGER.error("Unexpected auth HTTP status: %s", resp.status)

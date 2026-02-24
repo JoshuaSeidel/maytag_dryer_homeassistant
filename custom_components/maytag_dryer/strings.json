@@ -34,6 +34,7 @@
     "error": {
       "cannot_connect": "Unable to connect to the Whirlpool API. Check your network connection.",
       "invalid_auth": "Invalid email or password.",
+      "account_locked": "Your Whirlpool account is locked. Unlock it at account.maytag.com then try again.",
       "no_saids": "Please enter at least one dryer or washer SAID.",
       "unknown": "An unexpected error occurred."
     },
