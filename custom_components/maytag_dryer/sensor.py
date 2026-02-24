@@ -10,10 +10,9 @@ from time import mktime
 
 import voluptuous as vol
 
-from homeassistant.components.sensor import PLATFORM_SCHEMA
+from homeassistant.components.sensor import PLATFORM_SCHEMA, SensorEntity
 from homeassistant.core import callback
 import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import track_time_interval
 from homeassistant.util.dt import utc_from_timestamp
 
@@ -64,7 +63,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     if entitiesWasher:
         async_add_entities(entitiesWasher, True)
     
-class maytag_dryerSensor(Entity):
+class maytag_dryerSensor(SensorEntity):
     """A class for the mealviewer account."""
 
     def __init__(self, hass, user, password,said):
@@ -116,7 +115,7 @@ class maytag_dryerSensor(Entity):
         return 'sensor.maytag_dryer_' + (self._said).lower()
         
     @property
-    def state(self):
+    def native_value(self):
         """Return the state of the sensor."""
         return self._state
         
@@ -311,7 +310,7 @@ class maytag_dryerSensor(Entity):
         return ICON_D
 
 
-class maytag_washerSensor(Entity):
+class maytag_washerSensor(SensorEntity):
     
     """A class for the mealviewer account."""
 
@@ -376,7 +375,7 @@ class maytag_washerSensor(Entity):
         return 'sensor.maytag_washer_' + (self._said).lower()
         
     @property
-    def state(self):
+    def native_value(self):
         """Return the state of the sensor."""
         return self._state
         
